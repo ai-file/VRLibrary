@@ -35,12 +35,10 @@ align-items:center;
 
 }
 
-/* 下拉菜单 */
+/* 目录 */
 
 #folderMenu{
-
 position:relative;
-
 }
 
 #folderBtn{
@@ -92,7 +90,7 @@ border-radius:6px;
 
 }
 
-/* 缩略图 */
+/* 底部缩略图 */
 
 #thumbbar{
 
@@ -109,11 +107,44 @@ overflow-x:auto;
 
 }
 
+.thumb{
+
+position:relative;
+
+}
+
 .thumb img{
 
 height:80px;
 border-radius:6px;
 cursor:pointer;
+transition:.2s;
+
+}
+
+/* 悬浮预览 */
+
+.preview{
+
+position:absolute;
+bottom:90px;
+left:0;
+display:none;
+z-index:1000;
+
+}
+
+.preview img{
+
+width:280px;
+border-radius:8px;
+box-shadow:0 0 10px #000;
+
+}
+
+.thumb:hover .preview{
+
+display:block;
 
 }
 
@@ -134,23 +165,6 @@ text-align:center;
 
 }
 
-#progress{
-
-width:260px;
-height:6px;
-background:#333;
-margin-top:10px;
-
-}
-
-#bar{
-
-width:0%;
-height:6px;
-background:#00ffaa;
-
-}
-
 </style>
 
 </head>
@@ -167,8 +181,6 @@ background:#00ffaa;
 
 </div>
 
-<button onclick="randomPanorama()">随机</button>
-
 <button onclick="toggleRotate()">自动旋转</button>
 
 <button onclick="enterVR()">VR</button>
@@ -177,13 +189,7 @@ background:#00ffaa;
 
 <div id="loader">
 
-<div id="loadtext">扫描仓库...</div>
-
-<div id="progress">
-
-<div id="bar"></div>
-
-</div>
+扫描VR目录...
 
 </div>
 
@@ -207,9 +213,6 @@ const CDN=`https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/`;
 
 const thumbbar=document.getElementById("thumbbar");
 const folderList=document.getElementById("folderList");
-
-const loader=document.getElementById("loader");
-const bar=document.getElementById("bar");
 
 const sky=document.getElementById("sky");
 
@@ -250,11 +253,11 @@ buildMenu();
 
 showFolder(Object.keys(folders)[0]);
 
-loader.style.display="none";
+document.getElementById("loader").style.display="none";
 
 }catch(e){
 
-document.getElementById("loadtext").innerText="GitHub读取失败";
+document.getElementById("loader").innerText="GitHub读取失败";
 
 }
 
@@ -312,6 +315,20 @@ img.src=url;
 
 img.onclick=()=>loadPanorama(url);
 
+/* 悬浮预览 */
+
+const preview=document.createElement("div");
+
+preview.className="preview";
+
+const pimg=document.createElement("img");
+
+pimg.src=url;
+
+preview.appendChild(pimg);
+
+div.appendChild(preview);
+
 div.appendChild(img);
 
 thumbbar.appendChild(div);
@@ -333,14 +350,6 @@ sky.setAttribute("src",url);
 };
 
 img.src=url;
-
-}
-
-function randomPanorama(){
-
-const p=images[Math.floor(Math.random()*images.length)];
-
-loadPanorama(CDN+encodeURI(p));
 
 }
 
@@ -369,4 +378,5 @@ document.querySelector("a-scene").enterVR();
 </script>
 
 </body>
+
 </html>
