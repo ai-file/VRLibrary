@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>VR全景图库 V11</title>
+<title>VR全景图库 V12</title>
 
 <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
 
@@ -16,47 +16,42 @@ overflow:hidden;
 color:#fff;
 }
 
-/* 顶部栏 */
+/* 顶部 */
 
 #topbar{
 position:absolute;
 top:0;
 left:0;
 right:0;
-height:50px;
-background:rgba(0,0,0,.7);
+height:45px;
+background:#333;
 display:flex;
 align-items:center;
-gap:10px;
-padding:0 15px;
+padding:0 10px;
 z-index:999;
 }
-
-/* 路径 */
 
 #breadcrumb{
 flex:1;
 font-size:14px;
-color:#aaa;
+color:#ccc;
 }
 
-/* 目录 */
+/* 左侧目录 */
 
 #sidebar{
 position:absolute;
-top:50px;
+top:45px;
 bottom:100px;
 left:0;
-width:280px;
+width:260px;
 background:#111;
 overflow:auto;
-z-index:998;
 }
 
 .folder{
 padding:6px 10px;
 cursor:pointer;
-user-select:none;
 }
 
 .folder:hover{
@@ -68,19 +63,19 @@ display:none;
 padding-left:15px;
 }
 
-/* 底部缩略图 */
+/* 缩略图 */
 
 #thumbbar{
 position:absolute;
+bottom:0;
 left:0;
 right:0;
-bottom:0;
 height:100px;
 background:rgba(0,0,0,.8);
 display:flex;
 overflow-x:auto;
 gap:8px;
-padding:8px;
+padding:10px;
 }
 
 .thumb img{
@@ -93,38 +88,23 @@ cursor:pointer;
 
 #loader{
 position:absolute;
-left:50%;
 top:50%;
+left:50%;
 transform:translate(-50%,-50%);
 background:#000;
-padding:30px;
-border-radius:10px;
-text-align:center;
-z-index:1000;
-}
-
-#progress{
-height:6px;
-background:#333;
-margin-top:10px;
-border-radius:3px;
-overflow:hidden;
-}
-
-#bar{
-height:100%;
-width:0%;
-background:#00ffaa;
+padding:20px;
+border-radius:8px;
 }
 
 </style>
+
 </head>
 
 <body>
 
 <div id="topbar">
 
-<div id="breadcrumb">loading...</div>
+<div id="breadcrumb">加载中...</div>
 
 <button onclick="toggleRotate()">自动旋转</button>
 
@@ -134,15 +114,7 @@ background:#00ffaa;
 
 <div id="sidebar"></div>
 
-<div id="loader">
-
-扫描VR图库...
-
-<div id="progress">
-<div id="bar"></div>
-</div>
-
-</div>
+<div id="loader">扫描VR图库...</div>
 
 <div id="thumbbar"></div>
 
@@ -156,54 +128,43 @@ background:#00ffaa;
 
 <script>
 
-/* Github 配置 */
-
 const OWNER="ai-file";
 const REPO="VRLibrary";
-const BRANCH="main";
 
-const CDN=`https://cdn.jsdelivr.net/gh/${OWNER}/${REPO}@${BRANCH}/`;
+let BRANCH="main";
 
-/* DOM */
+const CDN=branch=>`https://cdn.jsdelivr.net/gh/${OWNER}/${REPO}@${branch}/`;
 
 const sidebar=document.getElementById("sidebar");
 const thumbbar=document.getElementById("thumbbar");
 const breadcrumb=document.getElementById("breadcrumb");
 const loader=document.getElementById("loader");
-const bar=document.getElementById("bar");
-
 const sky=document.getElementById("sky");
 
 let tree={};
-let currentFolder=[];
+let imageList=[];
+let currentIndex=0;
 let autoRotate=false;
-
-/* 初始化 */
 
 init();
 
 async function init(){
 
-let cache=localStorage.getItem("vr_tree");
+let data=localStorage.getItem("vr_tree");
 
-let data;
+if(data){
 
-if(cache){
-
-data=JSON.parse(cache);
+data=JSON.parse(data);
 
 }else{
 
-const api=`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`;
-
-const res=await fetch(api);
-data=await res.json();
+data=await scanGithub();
 
 localStorage.setItem("vr_tree",JSON.stringify(data));
 
 }
 
-buildTree(data.tree);
+buildTree(data);
 
 buildSidebar();
 
@@ -211,21 +172,45 @@ loader.style.display="none";
 
 }
 
-/* 构建目录树 */
+/* 自动识别分支 */
+
+async function scanGithub(){
+
+let url=`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/main?recursive=1`;
+
+let res=await fetch(url);
+
+if(res.status!==200){
+
+BRANCH="master";
+
+url=`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/master?recursive=1`;
+
+res=await fetch(url);
+
+}
+
+return (await res.json()).tree;
+
+}
+
+/* 构建树 */
 
 function buildTree(list){
 
-list.forEach((item,i)=>{
+list.forEach(item=>{
 
 if(!item.path.match(/\.(jpg|jpeg|png)$/i)) return;
+
+imageList.push(item.path);
 
 let parts=item.path.split("/");
 
 let node=tree;
 
-parts.forEach((p,idx)=>{
+parts.forEach((p,i)=>{
 
-if(idx===parts.length-1){
+if(i===parts.length-1){
 
 if(!node.images) node.images=[];
 
@@ -245,34 +230,32 @@ node=node[p];
 
 }
 
-/* 构建侧边目录 */
+/* 目录 */
 
 function buildSidebar(){
-
-sidebar.innerHTML="";
 
 renderNode(tree,sidebar,[]);
 
 }
 
-/* 递归生成目录 */
-
 function renderNode(node,container,path){
 
-Object.keys(node).forEach(key=>{
+Object.keys(node).forEach(k=>{
 
-if(key==="images") return;
+if(k==="images") return;
 
 let div=document.createElement("div");
+
 div.className="folder";
 
-let count=countImages(node[key]);
+let count=countImages(node[k]);
 
-div.innerText="▶ "+key+" ("+count+")";
+div.innerText="▶ "+k+" ("+count+")";
 
 container.appendChild(div);
 
 let children=document.createElement("div");
+
 children.className="children";
 
 container.appendChild(children);
@@ -282,36 +265,35 @@ div.onclick=()=>{
 children.style.display=
 children.style.display==="block"?"none":"block";
 
-currentFolder=[...path,key];
+showImages(node[k]);
 
-breadcrumb.innerText=currentFolder.join(" / ");
-
-showImages(node[key]);
+breadcrumb.innerText=[...path,k].join(" / ");
 
 };
 
-renderNode(node[key],children,[...path,key]);
+renderNode(node[k],children,[...path,k]);
 
 });
 
 }
 
-/* 统计图片 */
+/* 图片统计 */
 
 function countImages(node){
 
-let count=0;
+let c=0;
 
-if(node.images) count+=node.images.length;
+if(node.images) c+=node.images.length;
 
 Object.keys(node).forEach(k=>{
 
 if(typeof node[k]==="object")
-count+=countImages(node[k]);
+
+c+=countImages(node[k]);
 
 });
 
-return count;
+return c;
 
 }
 
@@ -321,11 +303,13 @@ function showImages(node){
 
 thumbbar.innerHTML="";
 
-if(!node.images) return;
+let imgs=[];
 
-node.images.forEach(p=>{
+collectImages(node,imgs);
 
-let url=CDN+encodeURI(p);
+imgs.forEach((p,i)=>{
+
+let url=CDN(BRANCH)+encodeURI(p);
 
 let div=document.createElement("div");
 
@@ -333,9 +317,15 @@ div.className="thumb";
 
 let img=document.createElement("img");
 
-img.src=url;
+img.dataset.src=url;
 
-img.onclick=()=>loadPanorama(url);
+img.onclick=()=>{
+
+currentIndex=i;
+
+loadPanorama(url);
+
+};
 
 div.appendChild(img);
 
@@ -343,15 +333,81 @@ thumbbar.appendChild(div);
 
 });
 
-loadPanorama(CDN+encodeURI(node.images[0]));
+lazyLoad();
+
+if(imgs.length)
+
+loadPanorama(CDN(BRANCH)+encodeURI(imgs[0]));
 
 }
 
-/* 加载全景 */
+/* 收集图片 */
+
+function collectImages(node,arr){
+
+if(node.images)
+
+arr.push(...node.images);
+
+Object.keys(node).forEach(k=>{
+
+if(typeof node[k]==="object")
+
+collectImages(node[k],arr);
+
+});
+
+}
+
+/* 懒加载 */
+
+function lazyLoad(){
+
+const imgs=document.querySelectorAll("#thumbbar img");
+
+const observer=new IntersectionObserver(entries=>{
+
+entries.forEach(e=>{
+
+if(e.isIntersecting){
+
+let img=e.target;
+
+img.src=img.dataset.src;
+
+observer.unobserve(img);
+
+}
+
+});
+
+});
+
+imgs.forEach(img=>observer.observe(img));
+
+}
+
+/* 全景 */
 
 function loadPanorama(url){
 
 sky.setAttribute("src",url);
+
+preloadNext();
+
+}
+
+/* 预加载 */
+
+function preloadNext(){
+
+let next=imageList[currentIndex+1];
+
+if(!next) return;
+
+let img=new Image();
+
+img.src=CDN(BRANCH)+next;
 
 }
 
@@ -381,6 +437,36 @@ sky.removeAttribute("animation");
 function enterVR(){
 
 document.querySelector("a-scene").enterVR();
+
+}
+
+/* 键盘浏览 */
+
+document.addEventListener("keydown",e=>{
+
+if(e.key==="ArrowRight") next();
+
+if(e.key==="ArrowLeft") prev();
+
+});
+
+function next(){
+
+currentIndex++;
+
+if(currentIndex>=imageList.length) return;
+
+loadPanorama(CDN(BRANCH)+imageList[currentIndex]);
+
+}
+
+function prev(){
+
+currentIndex--;
+
+if(currentIndex<0) return;
+
+loadPanorama(CDN(BRANCH)+imageList[currentIndex]);
 
 }
 
