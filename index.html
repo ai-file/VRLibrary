@@ -4,7 +4,7 @@
 <head>
 
 <meta charset="utf-8">
-<title>VR全景浏览 V5.6</title>
+<title>VR全景浏览</title>
 
 <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
 
@@ -17,8 +17,6 @@ font-family:Arial;
 overflow:hidden;
 }
 
-/* 顶部控制栏 */
-
 #topbar{
 position:absolute;
 top:10px;
@@ -30,18 +28,15 @@ padding:10px;
 border-radius:10px;
 display:flex;
 gap:10px;
-align-items:center;
 }
 
-button,input,select{
+button{
 background:#222;
 color:#fff;
 border:1px solid #444;
-padding:6px 10px;
+padding:6px 12px;
 border-radius:6px;
 }
-
-/* 缩略图栏 */
 
 #thumbbar{
 position:absolute;
@@ -54,10 +49,7 @@ display:flex;
 gap:10px;
 padding:5px;
 overflow-x:auto;
-z-index:999;
 }
-
-/* 缩略图 */
 
 .thumb img{
 height:80px;
@@ -67,13 +59,10 @@ transition:.2s;
 }
 
 .thumb img:hover{
-transform:scale(1.15);
+transform:scale(1.1);
 }
 
-/* 加载窗口 */
-
 #loader{
-
 position:absolute;
 left:50%;
 top:50%;
@@ -84,10 +73,7 @@ border-radius:10px;
 color:#00ffaa;
 z-index:1000;
 text-align:center;
-
 }
-
-/* 进度条 */
 
 #progress{
 width:260px;
@@ -109,10 +95,6 @@ background:#00ffaa;
 <body>
 
 <div id="topbar">
-
-<select id="folder"></select>
-
-<input id="search" placeholder="搜索">
 
 <button onclick="randomPanorama()">随机</button>
 
@@ -146,144 +128,68 @@ background:#00ffaa;
 
 <script>
 
-/* GitHub */
-
 const OWNER="ai-file";
 const REPO="VRLibrary";
 const BRANCH="main";
-
-/* 使用RAW CDN（支持中文路径） */
+const FOLDER="VR";
 
 const CDN=`https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/`;
 
-/* DOM */
-
-const sky=document.getElementById("sky");
 const thumbbar=document.getElementById("thumbbar");
-const search=document.getElementById("search");
-const folderSelect=document.getElementById("folder");
+const sky=document.getElementById("sky");
 
 const loader=document.getElementById("loader");
-const loadtext=document.getElementById("loadtext");
 const bar=document.getElementById("bar");
+const loadtext=document.getElementById("loadtext");
 
-/* 数据 */
-
-let files=[];
-let folders={};
-let currentList=[];
+let images=[];
 let autoRotate=false;
-
-/* 初始化 */
 
 init();
 
-/* 扫描仓库 */
-
 async function init(){
-
-loadtext.innerText="扫描仓库...";
-bar.style.width="20%";
 
 try{
 
-const api=`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`;
+loadtext.innerText="扫描VR目录...";
 
-const res=await fetch(api);
+const url=`https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${FOLDER}/`;
+
+const res=await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${FOLDER}`);
+
 const data=await res.json();
 
-data.tree.forEach(item=>{
+data.forEach(file=>{
 
-if(item.path.match(/\.(jpg|jpeg|png)$/i)){
+if(file.name.match(/\.(jpg|jpeg|png)$/i)){
 
-files.push(item.path);
-
-const parts=item.path.split("/");
-
-const folder=parts.length>1?parts[0]:"root";
-
-if(!folders[folder]) folders[folder]=[];
-
-folders[folder].push(item.path);
+images.push(FOLDER+"/"+file.name);
 
 }
 
 });
 
-buildFolders();
+buildThumbs();
 
-currentList=files;
+if(images.length>0){
 
-buildThumbs(currentList);
-
-bar.style.width="80%";
-
-if(files.length>0){
-
-loadPanorama(CDN+encodeURI(files[0]));
+loadPanorama(CDN+encodeURI(images[0]));
 
 }
 
 }catch(e){
 
-loadtext.innerText="GitHub读取失败";
+loadtext.innerText="读取仓库失败";
 
 }
 
 }
 
-/* 文件夹 */
-
-function buildFolders(){
-
-for(let f in folders){
-
-const op=document.createElement("option");
-
-op.value=f;
-op.innerText=f;
-
-folderSelect.appendChild(op);
-
-}
-
-}
-
-/* 切换文件夹 */
-
-folderSelect.onchange=function(){
-
-const f=this.value;
-
-currentList=folders[f];
-
-buildThumbs(currentList);
-
-loadPanorama(CDN+encodeURI(currentList[0]));
-
-};
-
-/* 搜索 */
-
-search.onkeyup=function(){
-
-const kw=this.value.toLowerCase();
-
-const result=files.filter(p=>p.toLowerCase().includes(kw));
-
-currentList=result;
-
-buildThumbs(currentList);
-
-};
-
-/* 缩略图 */
-
-function buildThumbs(list){
+function buildThumbs(){
 
 thumbbar.innerHTML="";
 
-list.forEach(p=>{
+images.forEach(p=>{
 
 const url=CDN+encodeURI(p);
 
@@ -293,15 +199,7 @@ div.className="thumb";
 
 const img=document.createElement("img");
 
-img.loading="lazy";
-
 img.src=url;
-
-img.onerror=function(){
-
-this.src="https://via.placeholder.com/150x80?text=IMG";
-
-};
 
 img.onclick=()=>loadPanorama(url);
 
@@ -313,15 +211,11 @@ thumbbar.appendChild(div);
 
 }
 
-/* 加载全景 */
-
 function loadPanorama(url){
 
 loader.style.display="block";
 
-loadtext.innerText="加载全景...";
-
-bar.style.width="30%";
+bar.style.width="40%";
 
 const img=new Image();
 
@@ -334,22 +228,9 @@ sky.setAttribute("src",url);
 setTimeout(()=>{
 
 loader.style.display="none";
-
 bar.style.width="0%";
 
 },400);
-
-};
-
-img.onerror=function(){
-
-loadtext.innerText="图片加载失败";
-
-setTimeout(()=>{
-
-loader.style.display="none";
-
-},1000);
 
 };
 
@@ -357,17 +238,13 @@ img.src=url;
 
 }
 
-/* 随机 */
-
 function randomPanorama(){
 
-const p=currentList[Math.floor(Math.random()*currentList.length)];
+const p=images[Math.floor(Math.random()*images.length)];
 
 loadPanorama(CDN+encodeURI(p));
 
 }
-
-/* 自动旋转 */
 
 function toggleRotate(){
 
@@ -384,8 +261,6 @@ sky.removeAttribute("animation");
 }
 
 }
-
-/* VR */
 
 function enterVR(){
 
