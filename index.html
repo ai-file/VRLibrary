@@ -1,10 +1,8 @@
 <!DOCTYPE html>
 <html>
-
 <head>
-
 <meta charset="utf-8">
-<title>VR全景图库</title>
+<title>VR全景图库 V11</title>
 
 <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
 
@@ -15,171 +13,118 @@ margin:0;
 background:#000;
 font-family:Arial;
 overflow:hidden;
+color:#fff;
 }
 
-/* 顶部 */
+/* 顶部栏 */
 
 #topbar{
-
 position:absolute;
-top:10px;
-left:50%;
-transform:translateX(-50%);
-z-index:999;
-background:rgba(0,0,0,.6);
-padding:10px;
-border-radius:10px;
+top:0;
+left:0;
+right:0;
+height:50px;
+background:rgba(0,0,0,.7);
 display:flex;
-gap:10px;
 align-items:center;
+gap:10px;
+padding:0 15px;
+z-index:999;
+}
 
+/* 路径 */
+
+#breadcrumb{
+flex:1;
+font-size:14px;
+color:#aaa;
 }
 
 /* 目录 */
 
-#folderMenu{
-position:relative;
-}
-
-#folderBtn{
-
-background:#222;
-color:#fff;
-border:1px solid #444;
-padding:6px 12px;
-border-radius:6px;
-cursor:pointer;
-
-}
-
-#folderList{
-
+#sidebar{
 position:absolute;
-top:35px;
+top:50px;
+bottom:100px;
 left:0;
+width:280px;
 background:#111;
-border:1px solid #333;
-display:none;
-max-height:300px;
 overflow:auto;
-min-width:200px;
-
+z-index:998;
 }
 
-.folderItem{
-
+.folder{
 padding:6px 10px;
 cursor:pointer;
-color:#ddd;
-
+user-select:none;
 }
 
-.folderItem:hover{
-
-background:#333;
-
-}
-
-button{
-
+.folder:hover{
 background:#222;
-color:#fff;
-border:1px solid #444;
-padding:6px 12px;
-border-radius:6px;
+}
 
+.children{
+display:none;
+padding-left:15px;
 }
 
 /* 底部缩略图 */
 
 #thumbbar{
-
 position:absolute;
-bottom:0;
 left:0;
 right:0;
-height:95px;
-background:rgba(0,0,0,.7);
+bottom:0;
+height:100px;
+background:rgba(0,0,0,.8);
 display:flex;
-gap:10px;
-padding:5px;
 overflow-x:auto;
-
-}
-
-.thumb{
-
-position:relative;
-
+gap:8px;
+padding:8px;
 }
 
 .thumb img{
-
 height:80px;
 border-radius:6px;
 cursor:pointer;
-transition:.2s;
-
-}
-
-/* 悬浮预览 */
-
-.preview{
-
-position:absolute;
-bottom:90px;
-left:0;
-display:none;
-z-index:1000;
-
-}
-
-.preview img{
-
-width:280px;
-border-radius:8px;
-box-shadow:0 0 10px #000;
-
-}
-
-.thumb:hover .preview{
-
-display:block;
-
 }
 
 /* 加载 */
 
 #loader{
-
 position:absolute;
 left:50%;
 top:50%;
 transform:translate(-50%,-50%);
-background:rgba(0,0,0,.85);
-padding:25px;
+background:#000;
+padding:30px;
 border-radius:10px;
-color:#00ffaa;
-z-index:1000;
 text-align:center;
+z-index:1000;
+}
 
+#progress{
+height:6px;
+background:#333;
+margin-top:10px;
+border-radius:3px;
+overflow:hidden;
+}
+
+#bar{
+height:100%;
+width:0%;
+background:#00ffaa;
 }
 
 </style>
-
 </head>
 
 <body>
 
 <div id="topbar">
 
-<div id="folderMenu">
-
-<button id="folderBtn">目录 ▼</button>
-
-<div id="folderList"></div>
-
-</div>
+<div id="breadcrumb">loading...</div>
 
 <button onclick="toggleRotate()">自动旋转</button>
 
@@ -187,9 +132,15 @@ text-align:center;
 
 </div>
 
+<div id="sidebar"></div>
+
 <div id="loader">
 
-扫描VR目录...
+扫描VR图库...
+
+<div id="progress">
+<div id="bar"></div>
+</div>
 
 </div>
 
@@ -197,7 +148,7 @@ text-align:center;
 
 <a-scene loading-screen="enabled:false">
 
-<a-sky id="sky" rotation="0 -90 0"></a-sky>
+<a-sky id="sky"></a-sky>
 
 <a-entity camera look-controls position="0 1.6 0"></a-entity>
 
@@ -205,129 +156,186 @@ text-align:center;
 
 <script>
 
+/* Github 配置 */
+
 const OWNER="ai-file";
 const REPO="VRLibrary";
 const BRANCH="main";
 
-const CDN=`https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/`;
+const CDN=`https://cdn.jsdelivr.net/gh/${OWNER}/${REPO}@${BRANCH}/`;
 
+/* DOM */
+
+const sidebar=document.getElementById("sidebar");
 const thumbbar=document.getElementById("thumbbar");
-const folderList=document.getElementById("folderList");
+const breadcrumb=document.getElementById("breadcrumb");
+const loader=document.getElementById("loader");
+const bar=document.getElementById("bar");
 
 const sky=document.getElementById("sky");
 
-let images=[];
-let folders={};
-
+let tree={};
+let currentFolder=[];
 let autoRotate=false;
+
+/* 初始化 */
 
 init();
 
 async function init(){
 
-try{
+let cache=localStorage.getItem("vr_tree");
+
+let data;
+
+if(cache){
+
+data=JSON.parse(cache);
+
+}else{
 
 const api=`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`;
 
 const res=await fetch(api);
+data=await res.json();
 
-const data=await res.json();
+localStorage.setItem("vr_tree",JSON.stringify(data));
 
-data.tree.forEach(item=>{
+}
 
-if(item.path.match(/\.(jpg|jpeg|png)$/i)){
+buildTree(data.tree);
 
-images.push(item.path);
+buildSidebar();
 
-const dir=item.path.substring(0,item.path.lastIndexOf("/"));
+loader.style.display="none";
 
-if(!folders[dir]) folders[dir]=[];
+}
 
-folders[dir].push(item.path);
+/* 构建目录树 */
+
+function buildTree(list){
+
+list.forEach((item,i)=>{
+
+if(!item.path.match(/\.(jpg|jpeg|png)$/i)) return;
+
+let parts=item.path.split("/");
+
+let node=tree;
+
+parts.forEach((p,idx)=>{
+
+if(idx===parts.length-1){
+
+if(!node.images) node.images=[];
+
+node.images.push(item.path);
+
+}else{
+
+if(!node[p]) node[p]={};
+
+node=node[p];
 
 }
 
 });
 
-buildMenu();
-
-showFolder(Object.keys(folders)[0]);
-
-document.getElementById("loader").style.display="none";
-
-}catch(e){
-
-document.getElementById("loader").innerText="GitHub读取失败";
+});
 
 }
 
+/* 构建侧边目录 */
+
+function buildSidebar(){
+
+sidebar.innerHTML="";
+
+renderNode(tree,sidebar,[]);
+
 }
 
-function buildMenu(){
+/* 递归生成目录 */
 
-folderList.innerHTML="";
+function renderNode(node,container,path){
 
-for(let f in folders){
+Object.keys(node).forEach(key=>{
 
-const div=document.createElement("div");
+if(key==="images") return;
 
-div.className="folderItem";
+let div=document.createElement("div");
+div.className="folder";
 
-div.innerText=f;
+let count=countImages(node[key]);
+
+div.innerText="▶ "+key+" ("+count+")";
+
+container.appendChild(div);
+
+let children=document.createElement("div");
+children.className="children";
+
+container.appendChild(children);
 
 div.onclick=()=>{
 
-showFolder(f);
+children.style.display=
+children.style.display==="block"?"none":"block";
 
-folderList.style.display="none";
+currentFolder=[...path,key];
 
-};
+breadcrumb.innerText=currentFolder.join(" / ");
 
-folderList.appendChild(div);
-
-}
-
-}
-
-document.getElementById("folderBtn").onclick=function(){
-
-folderList.style.display=
-
-folderList.style.display=="block"?"none":"block";
+showImages(node[key]);
 
 };
 
-function showFolder(folder){
+renderNode(node[key],children,[...path,key]);
+
+});
+
+}
+
+/* 统计图片 */
+
+function countImages(node){
+
+let count=0;
+
+if(node.images) count+=node.images.length;
+
+Object.keys(node).forEach(k=>{
+
+if(typeof node[k]==="object")
+count+=countImages(node[k]);
+
+});
+
+return count;
+
+}
+
+/* 显示缩略图 */
+
+function showImages(node){
 
 thumbbar.innerHTML="";
 
-folders[folder].forEach(p=>{
+if(!node.images) return;
 
-const url=CDN+encodeURI(p);
+node.images.forEach(p=>{
 
-const div=document.createElement("div");
+let url=CDN+encodeURI(p);
+
+let div=document.createElement("div");
 
 div.className="thumb";
 
-const img=document.createElement("img");
+let img=document.createElement("img");
 
 img.src=url;
 
 img.onclick=()=>loadPanorama(url);
-
-/* 悬浮预览 */
-
-const preview=document.createElement("div");
-
-preview.className="preview";
-
-const pimg=document.createElement("img");
-
-pimg.src=url;
-
-preview.appendChild(pimg);
-
-div.appendChild(preview);
 
 div.appendChild(img);
 
@@ -335,23 +343,19 @@ thumbbar.appendChild(div);
 
 });
 
-loadPanorama(CDN+encodeURI(folders[folder][0]));
+loadPanorama(CDN+encodeURI(node.images[0]));
 
 }
+
+/* 加载全景 */
 
 function loadPanorama(url){
 
-const img=new Image();
-
-img.onload=function(){
-
 sky.setAttribute("src",url);
 
-};
-
-img.src=url;
-
 }
+
+/* 自动旋转 */
 
 function toggleRotate(){
 
@@ -359,7 +363,10 @@ autoRotate=!autoRotate;
 
 if(autoRotate){
 
-sky.setAttribute("animation","property:rotation;to:0 360 0;loop:true;dur:30000");
+sky.setAttribute(
+"animation",
+"property:rotation;to:0 360 0;loop:true;dur:30000"
+);
 
 }else{
 
@@ -368,6 +375,8 @@ sky.removeAttribute("animation");
 }
 
 }
+
+/* VR */
 
 function enterVR(){
 
@@ -378,5 +387,4 @@ document.querySelector("a-scene").enterVR();
 </script>
 
 </body>
-
 </html>
