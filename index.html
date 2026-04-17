@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
+
 <meta charset="utf-8">
-<title>VR全景浏览 V5.3</title>
+<title>VR全景浏览 V5.4</title>
 
 <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
 
@@ -36,12 +37,8 @@ font-size:14px;
 cursor:pointer;
 }
 
-.file{
-color:#ccc;
-cursor:pointer;
-font-size:12px;
-margin-left:10px;
-margin-top:5px;
+.folder:hover{
+color:#fff;
 }
 
 /* 顶部 */
@@ -76,7 +73,7 @@ color:#00ffaa;
 z-index:999;
 }
 
-/* 悬浮缩略图 */
+/* 底部缩略图 */
 
 #thumbbar{
 
@@ -87,7 +84,7 @@ bottom:0;
 left:200px;
 right:0;
 
-height:90px;
+height:95px;
 
 background:rgba(0,0,0,0.7);
 
@@ -104,6 +101,12 @@ z-index:999;
 }
 
 /* 缩略图 */
+
+.thumb{
+
+flex:0 0 auto;
+
+}
 
 .thumb img{
 
@@ -161,7 +164,11 @@ const OWNER="ai-file";
 const REPO="VRLibrary";
 const BRANCH="main";
 
+/* CDN */
+
 const CDN=`https://cdn.jsdelivr.net/gh/${OWNER}/${REPO}@${BRANCH}/`;
+
+/* DOM */
 
 const sky=document.getElementById("sky");
 const sidebar=document.getElementById("sidebar");
@@ -169,10 +176,14 @@ const thumbbar=document.getElementById("thumbbar");
 const status=document.getElementById("status");
 const search=document.getElementById("search");
 
+/* 数据 */
+
 let files=[];
 let folders={};
 let currentList=[];
 let autoRotate=false;
+
+/* 初始化 */
 
 init();
 
@@ -217,7 +228,7 @@ status.innerText="发现 "+files.length+" 张图片";
 
 if(files.length>0){
 
-loadPanorama(CDN+files[0]);
+loadPanorama(CDN+encodeURI(files[0]));
 
 }
 
@@ -229,7 +240,7 @@ status.innerText="GitHub扫描失败";
 
 }
 
-/* 构建目录 */
+/* 目录 */
 
 function buildFolders(){
 
@@ -249,7 +260,7 @@ currentList=folders[f];
 
 buildThumbs(currentList);
 
-loadPanorama(CDN+currentList[0]);
+loadPanorama(CDN+encodeURI(currentList[0]));
 
 };
 
@@ -259,7 +270,7 @@ sidebar.appendChild(div);
 
 }
 
-/* 构建缩略图 */
+/* 缩略图 */
 
 function buildThumbs(list){
 
@@ -267,15 +278,21 @@ thumbbar.innerHTML="";
 
 list.forEach(p=>{
 
-const url=CDN+p;
+const url=CDN+encodeURI(p)+"?t="+Date.now();
 
 const div=document.createElement("div");
 
 div.className="thumb";
 
-div.innerHTML=`<img src="${url}">`;
+const img=document.createElement("img");
 
-div.onclick=()=>loadPanorama(url);
+img.loading="lazy";
+
+img.src=url;
+
+img.onclick=()=>loadPanorama(url);
+
+div.appendChild(img);
 
 thumbbar.appendChild(div);
 
@@ -311,7 +328,7 @@ function randomPanorama(){
 
 const p=currentList[Math.floor(Math.random()*currentList.length)];
 
-loadPanorama(CDN+p);
+loadPanorama(CDN+encodeURI(p));
 
 }
 
