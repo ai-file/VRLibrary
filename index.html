@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>VR全景浏览 V5.2</title>
+<title>VR全景浏览 V5.3</title>
 
 <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
 
@@ -33,6 +33,7 @@ z-index:999;
 color:#00ffaa;
 margin-top:10px;
 font-size:14px;
+cursor:pointer;
 }
 
 .file{
@@ -75,18 +76,18 @@ color:#00ffaa;
 z-index:999;
 }
 
-/* 悬浮缩略图栏 */
+/* 悬浮缩略图 */
 
 #thumbbar{
 
 position:absolute;
 
-bottom:-80px;
+bottom:0;
 
 left:200px;
 right:0;
 
-height:100px;
+height:90px;
 
 background:rgba(0,0,0,0.7);
 
@@ -94,19 +95,11 @@ display:flex;
 
 gap:10px;
 
-padding:10px;
+padding:5px;
 
 overflow-x:auto;
 
-transition:0.3s;
-
-}
-
-/* 鼠标靠近弹出 */
-
-#thumbbar:hover{
-
-bottom:0;
+z-index:999;
 
 }
 
@@ -126,7 +119,7 @@ transition:.2s;
 
 .thumb img:hover{
 
-transform:scale(1.1);
+transform:scale(1.15);
 
 }
 
@@ -178,11 +171,12 @@ const search=document.getElementById("search");
 
 let files=[];
 let folders={};
+let currentList=[];
 let autoRotate=false;
 
 init();
 
-/* 扫描GitHub */
+/* 扫描仓库 */
 
 async function init(){
 
@@ -202,6 +196,7 @@ if(item.path.match(/\.(jpg|jpeg|png)$/i)){
 files.push(item.path);
 
 const parts=item.path.split("/");
+
 const folder=parts.length>1?parts[0]:"root";
 
 if(!folders[folder]) folders[folder]=[];
@@ -214,7 +209,9 @@ folders[folder].push(item.path);
 
 buildFolders();
 
-buildThumbs(files);
+currentList=files;
+
+buildThumbs(currentList);
 
 status.innerText="发现 "+files.length+" 张图片";
 
@@ -232,7 +229,7 @@ status.innerText="GitHub扫描失败";
 
 }
 
-/* 目录 */
+/* 构建目录 */
 
 function buildFolders(){
 
@@ -244,29 +241,25 @@ const div=document.createElement("div");
 
 div.className="folder";
 
-div.innerText=f;
+div.innerText="📁 "+f;
+
+div.onclick=()=>{
+
+currentList=folders[f];
+
+buildThumbs(currentList);
+
+loadPanorama(CDN+currentList[0]);
+
+};
 
 sidebar.appendChild(div);
 
-folders[f].forEach(p=>{
-
-const file=document.createElement("div");
-
-file.className="file";
-
-file.innerText=p.split("/").pop();
-
-file.onclick=()=>loadPanorama(CDN+p);
-
-sidebar.appendChild(file);
-
-});
-
 }
 
 }
 
-/* 缩略图 */
+/* 构建缩略图 */
 
 function buildThumbs(list){
 
@@ -298,7 +291,9 @@ const kw=this.value.toLowerCase();
 
 const result=files.filter(p=>p.toLowerCase().includes(kw));
 
-buildThumbs(result);
+currentList=result;
+
+buildThumbs(currentList);
 
 };
 
@@ -314,7 +309,7 @@ sky.setAttribute("src",url);
 
 function randomPanorama(){
 
-const p=files[Math.floor(Math.random()*files.length)];
+const p=currentList[Math.floor(Math.random()*currentList.length)];
 
 loadPanorama(CDN+p);
 
