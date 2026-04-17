@@ -1,9 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-
 <meta charset="utf-8">
-<title>VR全景浏览 V5</title>
+<title>VR全景浏览 V5.2</title>
 
 <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
 
@@ -11,122 +10,107 @@
 
 body{
 margin:0;
-font-family:Arial;
 background:#000;
+font-family:Arial;
 overflow:hidden;
-}
-
-/* 顶部控制 */
-
-#topbar{
-
-position:absolute;
-top:10px;
-left:220px;
-
-z-index:1000;
-
-background:rgba(0,0,0,0.7);
-
-padding:10px;
-border-radius:8px;
-
-display:flex;
-gap:10px;
-
-}
-
-button,input{
-
-background:#222;
-color:#fff;
-border:1px solid #444;
-
-padding:6px 10px;
-border-radius:4px;
-
 }
 
 /* 左侧目录 */
 
 #sidebar{
-
 position:absolute;
 left:0;
 top:0;
 bottom:0;
-
 width:200px;
-
 background:#111;
-
 overflow:auto;
-
-z-index:999;
-
 padding:10px;
-
+z-index:999;
 }
 
 .folder{
-
-color:#0f9;
+color:#00ffaa;
 margin-top:10px;
 font-size:14px;
-
 }
 
 .file{
-
 color:#ccc;
-
 cursor:pointer;
-
 font-size:12px;
-
 margin-left:10px;
-margin-top:4px;
+margin-top:5px;
+}
 
+/* 顶部 */
+
+#topbar{
+position:absolute;
+top:10px;
+left:220px;
+z-index:1000;
+background:rgba(0,0,0,.6);
+padding:10px;
+border-radius:8px;
+display:flex;
+gap:10px;
+}
+
+button,input{
+background:#222;
+color:#fff;
+border:1px solid #444;
+padding:6px 10px;
+border-radius:4px;
 }
 
 /* 状态 */
 
 #status{
-
 position:absolute;
-
 top:70px;
 left:220px;
-
 color:#00ffaa;
-
 z-index:999;
-
 }
 
-/* 缩略图 */
+/* 悬浮缩略图栏 */
 
 #thumbbar{
 
 position:absolute;
 
-bottom:0;
+bottom:-80px;
+
 left:200px;
 right:0;
 
 height:100px;
 
-background:rgba(0,0,0,.6);
+background:rgba(0,0,0,0.7);
 
 display:flex;
 
 gap:10px;
 
-overflow-x:auto;
-
 padding:10px;
 
+overflow-x:auto;
+
+transition:0.3s;
+
 }
+
+/* 鼠标靠近弹出 */
+
+#thumbbar:hover{
+
+bottom:0;
+
+}
+
+/* 缩略图 */
 
 .thumb img{
 
@@ -135,6 +119,14 @@ height:80px;
 border-radius:6px;
 
 cursor:pointer;
+
+transition:.2s;
+
+}
+
+.thumb img:hover{
+
+transform:scale(1.1);
 
 }
 
@@ -172,8 +164,6 @@ cursor:pointer;
 
 <script>
 
-/* GitHub仓库 */
-
 const OWNER="ai-file";
 const REPO="VRLibrary";
 const BRANCH="main";
@@ -190,9 +180,9 @@ let files=[];
 let folders={};
 let autoRotate=false;
 
-/* 初始化 */
-
 init();
+
+/* 扫描GitHub */
 
 async function init(){
 
@@ -223,6 +213,7 @@ folders[folder].push(item.path);
 });
 
 buildFolders();
+
 buildThumbs(files);
 
 status.innerText="发现 "+files.length+" 张图片";
@@ -241,7 +232,7 @@ status.innerText="GitHub扫描失败";
 
 }
 
-/* 构建目录 */
+/* 目录 */
 
 function buildFolders(){
 
@@ -275,7 +266,7 @@ sidebar.appendChild(file);
 
 }
 
-/* 构建缩略图 */
+/* 缩略图 */
 
 function buildThumbs(list){
 
@@ -358,5 +349,4 @@ document.querySelector("a-scene").enterVR();
 </script>
 
 </body>
-
 </html>
