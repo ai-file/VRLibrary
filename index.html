@@ -17,6 +17,8 @@ font-family:Arial;
 overflow:hidden;
 }
 
+/* 顶部菜单 */
+
 #topbar{
 position:absolute;
 top:10px;
@@ -30,15 +32,20 @@ display:flex;
 gap:10px;
 }
 
-button{
+select,button{
+
 background:#222;
 color:#fff;
 border:1px solid #444;
 padding:6px 12px;
 border-radius:6px;
+
 }
 
+/* 缩略图 */
+
 #thumbbar{
+
 position:absolute;
 bottom:0;
 left:0;
@@ -49,20 +56,28 @@ display:flex;
 gap:10px;
 padding:5px;
 overflow-x:auto;
+
 }
 
 .thumb img{
+
 height:80px;
 border-radius:6px;
 cursor:pointer;
 transition:.2s;
+
 }
 
 .thumb img:hover{
+
 transform:scale(1.1);
+
 }
 
+/* 加载窗口 */
+
 #loader{
+
 position:absolute;
 left:50%;
 top:50%;
@@ -73,19 +88,24 @@ border-radius:10px;
 color:#00ffaa;
 z-index:1000;
 text-align:center;
+
 }
 
 #progress{
+
 width:260px;
 height:6px;
 background:#333;
 margin-top:10px;
+
 }
 
 #bar{
+
 width:0%;
 height:6px;
 background:#00ffaa;
+
 }
 
 </style>
@@ -95,6 +115,8 @@ background:#00ffaa;
 <body>
 
 <div id="topbar">
+
+<select id="folder"></select>
 
 <button onclick="randomPanorama()">随机</button>
 
@@ -106,7 +128,7 @@ background:#00ffaa;
 
 <div id="loader">
 
-<div id="loadtext">扫描图片...</div>
+<div id="loadtext">扫描VR目录...</div>
 
 <div id="progress">
 
@@ -131,65 +153,89 @@ background:#00ffaa;
 const OWNER="ai-file";
 const REPO="VRLibrary";
 const BRANCH="main";
-const FOLDER="VR";
+const ROOT="VR";
 
 const CDN=`https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/`;
 
-const thumbbar=document.getElementById("thumbbar");
 const sky=document.getElementById("sky");
+const thumbbar=document.getElementById("thumbbar");
+const folderSelect=document.getElementById("folder");
 
 const loader=document.getElementById("loader");
 const bar=document.getElementById("bar");
-const loadtext=document.getElementById("loadtext");
 
-let images=[];
+let folders={};
+let currentList=[];
 let autoRotate=false;
 
 init();
 
 async function init(){
 
-try{
+const url=`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`;
 
-loadtext.innerText="扫描VR目录...";
-
-const url=`https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${FOLDER}/`;
-
-const res=await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${FOLDER}`);
+const res=await fetch(url);
 
 const data=await res.json();
 
-data.forEach(file=>{
+data.tree.forEach(item=>{
 
-if(file.name.match(/\.(jpg|jpeg|png)$/i)){
+if(item.path.startsWith(ROOT) && item.path.match(/\.(jpg|jpeg|png)$/i)){
 
-images.push(FOLDER+"/"+file.name);
+const parts=item.path.split("/");
+
+const folder=parts.length>2 ? parts[1] : "默认";
+
+if(!folders[folder]) folders[folder]=[];
+
+folders[folder].push(item.path);
 
 }
 
 });
 
-buildThumbs();
-
-if(images.length>0){
-
-loadPanorama(CDN+encodeURI(images[0]));
+buildFolders();
 
 }
 
-}catch(e){
+function buildFolders(){
 
-loadtext.innerText="读取仓库失败";
+for(let f in folders){
+
+const op=document.createElement("option");
+
+op.value=f;
+op.innerText=f;
+
+folderSelect.appendChild(op);
 
 }
 
+loadFolder(folderSelect.value);
+
 }
 
-function buildThumbs(){
+folderSelect.onchange=function(){
+
+loadFolder(this.value);
+
+};
+
+function loadFolder(name){
+
+currentList=folders[name];
+
+buildThumbs(currentList);
+
+loadPanorama(CDN+encodeURI(currentList[0]));
+
+}
+
+function buildThumbs(list){
 
 thumbbar.innerHTML="";
 
-images.forEach(p=>{
+list.forEach(p=>{
 
 const url=CDN+encodeURI(p);
 
@@ -240,7 +286,7 @@ img.src=url;
 
 function randomPanorama(){
 
-const p=images[Math.floor(Math.random()*images.length)];
+const p=currentList[Math.floor(Math.random()*currentList.length)];
 
 loadPanorama(CDN+encodeURI(p));
 
