@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>VR全景图库 V12</title>
+<title>VR全景图库</title>
 
 <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
 
@@ -13,108 +13,77 @@ margin:0;
 background:#000;
 font-family:Arial;
 overflow:hidden;
-color:#fff;
 }
 
 /* 顶部 */
 
 #topbar{
 position:absolute;
-top:0;
-left:0;
-right:0;
-height:45px;
-background:#333;
+top:20px;
+left:20px;
 display:flex;
-align-items:center;
-padding:0 10px;
+gap:10px;
 z-index:999;
 }
 
-#breadcrumb{
-flex:1;
-font-size:14px;
-color:#ccc;
-}
+select{
 
-/* 左侧目录 */
-
-#sidebar{
-position:absolute;
-top:45px;
-bottom:100px;
-left:0;
-width:260px;
-background:#111;
-overflow:auto;
-}
-
-.folder{
-padding:6px 10px;
-cursor:pointer;
-}
-
-.folder:hover{
 background:#222;
-}
-
-.children{
-display:none;
-padding-left:15px;
+color:#fff;
+border:none;
+padding:10px;
+border-radius:8px;
+font-size:14px;
 }
 
 /* 缩略图 */
 
 #thumbbar{
+
 position:absolute;
-bottom:0;
-left:0;
-right:0;
-height:100px;
-background:rgba(0,0,0,.8);
-display:flex;
-overflow-x:auto;
-gap:8px;
+bottom:30px;
+left:50%;
+transform:translateX(-50%);
+
+background:rgba(0,0,0,.6);
+
 padding:10px;
+border-radius:12px;
+
+display:flex;
+gap:12px;
 }
 
 .thumb img{
-height:80px;
-border-radius:6px;
+
+height:70px;
+border-radius:8px;
 cursor:pointer;
+border:2px solid transparent;
 }
 
-/* 加载 */
+.thumb img:hover{
 
-#loader{
-position:absolute;
-top:50%;
-left:50%;
-transform:translate(-50%,-50%);
-background:#000;
-padding:20px;
-border-radius:8px;
+border:2px solid #00ffaa;
+
 }
 
 </style>
-
 </head>
 
 <body>
 
 <div id="topbar">
 
-<div id="breadcrumb">加载中...</div>
+<select id="level1"></select>
+
+<select id="level2"></select>
 
 <button onclick="toggleRotate()">自动旋转</button>
 
 <button onclick="enterVR()">VR</button>
 
 </div>
-
-<div id="sidebar"></div>
-
-<div id="loader">扫描VR图库...</div>
 
 <div id="thumbbar"></div>
 
@@ -130,186 +99,108 @@ border-radius:8px;
 
 const OWNER="ai-file";
 const REPO="VRLibrary";
+const BRANCH="main";
 
-let BRANCH="main";
+const CDN=`https://cdn.jsdelivr.net/gh/${OWNER}/${REPO}@${BRANCH}/`;
 
-const CDN=branch=>`https://cdn.jsdelivr.net/gh/${OWNER}/${REPO}@${branch}/`;
-
-const sidebar=document.getElementById("sidebar");
+const level1=document.getElementById("level1");
+const level2=document.getElementById("level2");
 const thumbbar=document.getElementById("thumbbar");
-const breadcrumb=document.getElementById("breadcrumb");
-const loader=document.getElementById("loader");
 const sky=document.getElementById("sky");
 
-let tree={};
-let imageList=[];
-let currentIndex=0;
+let folders={};
+
 let autoRotate=false;
 
 init();
 
 async function init(){
 
-let data=localStorage.getItem("vr_tree");
+const api=`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`;
 
-if(data){
+const res=await fetch(api);
 
-data=JSON.parse(data);
+const data=await res.json();
 
-}else{
-
-data=await scanGithub();
-
-localStorage.setItem("vr_tree",JSON.stringify(data));
-
-}
-
-buildTree(data);
-
-buildSidebar();
-
-loader.style.display="none";
-
-}
-
-/* 自动识别分支 */
-
-async function scanGithub(){
-
-let url=`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/main?recursive=1`;
-
-let res=await fetch(url);
-
-if(res.status!==200){
-
-BRANCH="master";
-
-url=`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/master?recursive=1`;
-
-res=await fetch(url);
-
-}
-
-return (await res.json()).tree;
-
-}
-
-/* 构建树 */
-
-function buildTree(list){
-
-list.forEach(item=>{
+data.tree.forEach(item=>{
 
 if(!item.path.match(/\.(jpg|jpeg|png)$/i)) return;
 
-imageList.push(item.path);
-
 let parts=item.path.split("/");
 
-let node=tree;
+if(parts.length<3) return;
 
-parts.forEach((p,i)=>{
+let f1=parts[0];
+let f2=parts[1];
 
-if(i===parts.length-1){
+if(!folders[f1]) folders[f1]={};
 
-if(!node.images) node.images=[];
+if(!folders[f1][f2]) folders[f1][f2]=[];
 
-node.images.push(item.path);
-
-}else{
-
-if(!node[p]) node[p]={};
-
-node=node[p];
-
-}
+folders[f1][f2].push(item.path);
 
 });
 
-});
+buildLevel1();
 
 }
 
-/* 目录 */
+function buildLevel1(){
 
-function buildSidebar(){
+level1.innerHTML="";
 
-renderNode(tree,sidebar,[]);
+Object.keys(folders).forEach(f=>{
 
-}
+let op=document.createElement("option");
 
-function renderNode(node,container,path){
+op.value=f;
+op.text=f;
 
-Object.keys(node).forEach(k=>{
-
-if(k==="images") return;
-
-let div=document.createElement("div");
-
-div.className="folder";
-
-let count=countImages(node[k]);
-
-div.innerText="▶ "+k+" ("+count+")";
-
-container.appendChild(div);
-
-let children=document.createElement("div");
-
-children.className="children";
-
-container.appendChild(children);
-
-div.onclick=()=>{
-
-children.style.display=
-children.style.display==="block"?"none":"block";
-
-showImages(node[k]);
-
-breadcrumb.innerText=[...path,k].join(" / ");
-
-};
-
-renderNode(node[k],children,[...path,k]);
+level1.appendChild(op);
 
 });
 
+buildLevel2();
+
 }
 
-/* 图片统计 */
+function buildLevel2(){
 
-function countImages(node){
+let f1=level1.value;
 
-let c=0;
+level2.innerHTML="";
 
-if(node.images) c+=node.images.length;
+Object.keys(folders[f1]).forEach(f=>{
 
-Object.keys(node).forEach(k=>{
+let op=document.createElement("option");
 
-if(typeof node[k]==="object")
+op.value=f;
+op.text=f;
 
-c+=countImages(node[k]);
+level2.appendChild(op);
 
 });
 
-return c;
+showImages();
 
 }
 
-/* 显示缩略图 */
+level1.onchange=buildLevel2;
 
-function showImages(node){
+level2.onchange=showImages;
+
+function showImages(){
 
 thumbbar.innerHTML="";
 
-let imgs=[];
+let f1=level1.value;
+let f2=level2.value;
 
-collectImages(node,imgs);
+let list=folders[f1][f2];
 
-imgs.forEach((p,i)=>{
+list.forEach((p,i)=>{
 
-let url=CDN(BRANCH)+encodeURI(p);
+let url=CDN+encodeURI(p);
 
 let div=document.createElement("div");
 
@@ -317,15 +208,9 @@ div.className="thumb";
 
 let img=document.createElement("img");
 
-img.dataset.src=url;
+img.src=url;
 
-img.onclick=()=>{
-
-currentIndex=i;
-
-loadPanorama(url);
-
-};
+img.onclick=()=>loadPanorama(url);
 
 div.appendChild(img);
 
@@ -333,85 +218,15 @@ thumbbar.appendChild(div);
 
 });
 
-lazyLoad();
-
-if(imgs.length)
-
-loadPanorama(CDN(BRANCH)+encodeURI(imgs[0]));
+loadPanorama(CDN+encodeURI(list[0]));
 
 }
-
-/* 收集图片 */
-
-function collectImages(node,arr){
-
-if(node.images)
-
-arr.push(...node.images);
-
-Object.keys(node).forEach(k=>{
-
-if(typeof node[k]==="object")
-
-collectImages(node[k],arr);
-
-});
-
-}
-
-/* 懒加载 */
-
-function lazyLoad(){
-
-const imgs=document.querySelectorAll("#thumbbar img");
-
-const observer=new IntersectionObserver(entries=>{
-
-entries.forEach(e=>{
-
-if(e.isIntersecting){
-
-let img=e.target;
-
-img.src=img.dataset.src;
-
-observer.unobserve(img);
-
-}
-
-});
-
-});
-
-imgs.forEach(img=>observer.observe(img));
-
-}
-
-/* 全景 */
 
 function loadPanorama(url){
 
 sky.setAttribute("src",url);
 
-preloadNext();
-
 }
-
-/* 预加载 */
-
-function preloadNext(){
-
-let next=imageList[currentIndex+1];
-
-if(!next) return;
-
-let img=new Image();
-
-img.src=CDN(BRANCH)+next;
-
-}
-
-/* 自动旋转 */
 
 function toggleRotate(){
 
@@ -432,41 +247,9 @@ sky.removeAttribute("animation");
 
 }
 
-/* VR */
-
 function enterVR(){
 
 document.querySelector("a-scene").enterVR();
-
-}
-
-/* 键盘浏览 */
-
-document.addEventListener("keydown",e=>{
-
-if(e.key==="ArrowRight") next();
-
-if(e.key==="ArrowLeft") prev();
-
-});
-
-function next(){
-
-currentIndex++;
-
-if(currentIndex>=imageList.length) return;
-
-loadPanorama(CDN(BRANCH)+imageList[currentIndex]);
-
-}
-
-function prev(){
-
-currentIndex--;
-
-if(currentIndex<0) return;
-
-loadPanorama(CDN(BRANCH)+imageList[currentIndex]);
 
 }
 
