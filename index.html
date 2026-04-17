@@ -17,35 +17,59 @@ font-family:Arial;
 overflow:hidden;
 }
 
-/* 顶部菜单 */
+/* 顶部栏 */
 
 #topbar{
 position:absolute;
 top:10px;
 left:50%;
 transform:translateX(-50%);
-z-index:999;
 background:rgba(0,0,0,.6);
-padding:10px;
+padding:8px 15px;
 border-radius:10px;
 display:flex;
 gap:10px;
+z-index:999;
 }
 
-select,button{
+/* 目录按钮 */
 
-background:#222;
+#menuBtn{
+cursor:pointer;
+}
+
+/* 折叠菜单 */
+
+#menu{
+position:absolute;
+top:55px;
+left:20px;
+width:260px;
+max-height:400px;
+overflow:auto;
+background:#111;
 color:#fff;
-border:1px solid #444;
-padding:6px 12px;
-border-radius:6px;
+border-radius:10px;
+padding:10px;
+display:none;
+z-index:999;
+}
 
+.folder{
+margin-top:6px;
+cursor:pointer;
+color:#00ffaa;
+}
+
+.file{
+margin-left:15px;
+cursor:pointer;
+color:#ccc;
 }
 
 /* 缩略图 */
 
 #thumbbar{
-
 position:absolute;
 bottom:0;
 left:0;
@@ -56,28 +80,22 @@ display:flex;
 gap:10px;
 padding:5px;
 overflow-x:auto;
-
 }
 
 .thumb img{
-
 height:80px;
 border-radius:6px;
 cursor:pointer;
 transition:.2s;
-
 }
 
 .thumb img:hover{
-
 transform:scale(1.1);
-
 }
 
 /* 加载窗口 */
 
 #loader{
-
 position:absolute;
 left:50%;
 top:50%;
@@ -87,25 +105,6 @@ padding:25px;
 border-radius:10px;
 color:#00ffaa;
 z-index:1000;
-text-align:center;
-
-}
-
-#progress{
-
-width:260px;
-height:6px;
-background:#333;
-margin-top:10px;
-
-}
-
-#bar{
-
-width:0%;
-height:6px;
-background:#00ffaa;
-
 }
 
 </style>
@@ -116,7 +115,7 @@ background:#00ffaa;
 
 <div id="topbar">
 
-<select id="folder"></select>
+<button id="menuBtn">📂目录</button>
 
 <button onclick="randomPanorama()">随机</button>
 
@@ -126,17 +125,9 @@ background:#00ffaa;
 
 </div>
 
-<div id="loader">
+<div id="menu"></div>
 
-<div id="loadtext">扫描VR目录...</div>
-
-<div id="progress">
-
-<div id="bar"></div>
-
-</div>
-
-</div>
+<div id="loader">扫描仓库...</div>
 
 <div id="thumbbar"></div>
 
@@ -150,159 +141,150 @@ background:#00ffaa;
 
 <script>
 
-const OWNER="ai-file";
-const REPO="VRLibrary";
-const BRANCH="main";
-const ROOT="VR";
+const OWNER="ai-file"
+const REPO="VRLibrary"
+const BRANCH="main"
 
-const CDN=`https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/`;
+const CDN=`https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/`
 
-const sky=document.getElementById("sky");
-const thumbbar=document.getElementById("thumbbar");
-const folderSelect=document.getElementById("folder");
+const sky=document.getElementById("sky")
+const menu=document.getElementById("menu")
+const thumbbar=document.getElementById("thumbbar")
+const loader=document.getElementById("loader")
 
-const loader=document.getElementById("loader");
-const bar=document.getElementById("bar");
+let files=[]
+let folders={}
+let autoRotate=false
 
-let folders={};
-let currentList=[];
-let autoRotate=false;
-
-init();
+init()
 
 async function init(){
 
-const url=`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`;
+const api=`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`
 
-const res=await fetch(url);
+const res=await fetch(api)
 
-const data=await res.json();
+const data=await res.json()
 
 data.tree.forEach(item=>{
 
-if(item.path.startsWith(ROOT) && item.path.match(/\.(jpg|jpeg|png)$/i)){
+if(item.path.match(/\.(jpg|jpeg|png)$/i)){
 
-const parts=item.path.split("/");
+files.push(item.path)
 
-const folder=parts.length>2 ? parts[1] : "默认";
+const parts=item.path.split("/")
 
-if(!folders[folder]) folders[folder]=[];
+const folder=parts.length>1?parts[0]:"root"
 
-folders[folder].push(item.path);
+if(!folders[folder]) folders[folder]=[]
 
-}
-
-});
-
-buildFolders();
+folders[folder].push(item.path)
 
 }
 
-function buildFolders(){
+})
+
+buildMenu()
+
+loader.style.display="none"
+
+if(files.length>0){
+
+loadPanorama(CDN+encodeURI(files[0]))
+
+}
+
+}
+
+function buildMenu(){
+
+menu.innerHTML=""
 
 for(let f in folders){
 
-const op=document.createElement("option");
+const folderDiv=document.createElement("div")
 
-op.value=f;
-op.innerText=f;
+folderDiv.className="folder"
 
-folderSelect.appendChild(op);
+folderDiv.innerText="📂 "+f
+
+menu.appendChild(folderDiv)
+
+folders[f].forEach(file=>{
+
+const fileDiv=document.createElement("div")
+
+fileDiv.className="file"
+
+fileDiv.innerText=file.split("/")[1]
+
+fileDiv.onclick=()=>{
+
+loadPanorama(CDN+encodeURI(file))
+
+buildThumbs(folders[f])
 
 }
 
-loadFolder(folderSelect.value);
+menu.appendChild(fileDiv)
+
+})
 
 }
-
-folderSelect.onchange=function(){
-
-loadFolder(this.value);
-
-};
-
-function loadFolder(name){
-
-currentList=folders[name];
-
-buildThumbs(currentList);
-
-loadPanorama(CDN+encodeURI(currentList[0]));
 
 }
 
 function buildThumbs(list){
 
-thumbbar.innerHTML="";
+thumbbar.innerHTML=""
 
 list.forEach(p=>{
 
-const url=CDN+encodeURI(p);
+const url=CDN+encodeURI(p)
 
-const div=document.createElement("div");
+const div=document.createElement("div")
 
-div.className="thumb";
+div.className="thumb"
 
-const img=document.createElement("img");
+const img=document.createElement("img")
 
-img.src=url;
+img.src=url
 
-img.onclick=()=>loadPanorama(url);
+img.onclick=()=>loadPanorama(url)
 
-div.appendChild(img);
+div.appendChild(img)
 
-thumbbar.appendChild(div);
+thumbbar.appendChild(div)
 
-});
+})
 
 }
 
 function loadPanorama(url){
 
-loader.style.display="block";
-
-bar.style.width="40%";
-
-const img=new Image();
-
-img.onload=function(){
-
-bar.style.width="100%";
-
-sky.setAttribute("src",url);
-
-setTimeout(()=>{
-
-loader.style.display="none";
-bar.style.width="0%";
-
-},400);
-
-};
-
-img.src=url;
+sky.setAttribute("src",url)
 
 }
 
 function randomPanorama(){
 
-const p=currentList[Math.floor(Math.random()*currentList.length)];
+const p=files[Math.floor(Math.random()*files.length)]
 
-loadPanorama(CDN+encodeURI(p));
+loadPanorama(CDN+encodeURI(p))
 
 }
 
 function toggleRotate(){
 
-autoRotate=!autoRotate;
+autoRotate=!autoRotate
 
 if(autoRotate){
 
-sky.setAttribute("animation","property:rotation;to:0 360 0;loop:true;dur:30000");
+sky.setAttribute("animation","property:rotation;to:0 360 0;loop:true;dur:30000")
 
 }else{
 
-sky.removeAttribute("animation");
+sky.removeAttribute("animation")
 
 }
 
@@ -310,7 +292,15 @@ sky.removeAttribute("animation");
 
 function enterVR(){
 
-document.querySelector("a-scene").enterVR();
+document.querySelector("a-scene").enterVR()
+
+}
+
+/* 菜单开关 */
+
+document.getElementById("menuBtn").onclick=function(){
+
+menu.style.display=menu.style.display=="block"?"none":"block"
 
 }
 
