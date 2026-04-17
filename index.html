@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
+
 <meta charset="utf-8">
-<title>VR全景浏览</title>
+<title>VR全景浏览 V5</title>
 
 <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
 
@@ -10,71 +11,144 @@
 
 body{
 margin:0;
-background:#000;
 font-family:Arial;
+background:#000;
 overflow:hidden;
 }
 
+/* 顶部控制 */
+
 #topbar{
+
 position:absolute;
 top:10px;
-left:10px;
-z-index:999;
-background:rgba(0,0,0,.6);
+left:220px;
+
+z-index:1000;
+
+background:rgba(0,0,0,0.7);
+
 padding:10px;
 border-radius:8px;
-display:flex;
-gap:8px;
-}
 
-select,input,button{
-background:#222;
-color:#fff;
-border:1px solid #555;
-padding:6px 10px;
-border-radius:4px;
-}
-
-#thumb-bar{
-position:absolute;
-bottom:10px;
-left:50%;
-transform:translateX(-50%);
 display:flex;
 gap:10px;
-background:rgba(0,0,0,.4);
+
+}
+
+button,input{
+
+background:#222;
+color:#fff;
+border:1px solid #444;
+
+padding:6px 10px;
+border-radius:4px;
+
+}
+
+/* 左侧目录 */
+
+#sidebar{
+
+position:absolute;
+left:0;
+top:0;
+bottom:0;
+
+width:200px;
+
+background:#111;
+
+overflow:auto;
+
+z-index:999;
+
 padding:10px;
-border-radius:8px;
-max-width:95%;
+
+}
+
+.folder{
+
+color:#0f9;
+margin-top:10px;
+font-size:14px;
+
+}
+
+.file{
+
+color:#ccc;
+
+cursor:pointer;
+
+font-size:12px;
+
+margin-left:10px;
+margin-top:4px;
+
+}
+
+/* 状态 */
+
+#status{
+
+position:absolute;
+
+top:70px;
+left:220px;
+
+color:#00ffaa;
+
+z-index:999;
+
+}
+
+/* 缩略图 */
+
+#thumbbar{
+
+position:absolute;
+
+bottom:0;
+left:200px;
+right:0;
+
+height:100px;
+
+background:rgba(0,0,0,.6);
+
+display:flex;
+
+gap:10px;
+
 overflow-x:auto;
+
+padding:10px;
+
 }
 
 .thumb img{
-width:120px;
-height:70px;
-object-fit:cover;
-border-radius:5px;
-cursor:pointer;
-}
 
-#status{
-position:absolute;
-top:70px;
-left:10px;
-color:#00ffaa;
-z-index:999;
+height:80px;
+
+border-radius:6px;
+
+cursor:pointer;
+
 }
 
 </style>
+
 </head>
 
 <body>
 
+<div id="sidebar"></div>
+
 <div id="topbar">
 
-<select id="folder"></select>
-
-<input id="search" placeholder="搜索">
+<input id="search" placeholder="搜索图片">
 
 <button onclick="randomPanorama()">随机</button>
 
@@ -86,17 +160,19 @@ z-index:999;
 
 <div id="status">初始化...</div>
 
-<div id="thumb-bar"></div>
+<div id="thumbbar"></div>
 
 <a-scene loading-screen="enabled:false">
 
-<a-sky id="sky"></a-sky>
+<a-sky id="sky" rotation="0 -90 0"></a-sky>
 
 <a-entity camera look-controls position="0 1.6 0"></a-entity>
 
 </a-scene>
 
 <script>
+
+/* GitHub仓库 */
 
 const OWNER="ai-file";
 const REPO="VRLibrary";
@@ -105,11 +181,16 @@ const BRANCH="main";
 const CDN=`https://cdn.jsdelivr.net/gh/${OWNER}/${REPO}@${BRANCH}/`;
 
 const sky=document.getElementById("sky");
-const thumbBar=document.getElementById("thumb-bar");
+const sidebar=document.getElementById("sidebar");
+const thumbbar=document.getElementById("thumbbar");
 const status=document.getElementById("status");
+const search=document.getElementById("search");
 
 let files=[];
+let folders={};
 let autoRotate=false;
+
+/* 初始化 */
 
 init();
 
@@ -119,34 +200,38 @@ status.innerText="扫描仓库...";
 
 try{
 
-const url=`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`;
+const api=`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`;
 
-const res=await fetch(url);
+const res=await fetch(api);
 const data=await res.json();
 
-data.tree.forEach(f=>{
+data.tree.forEach(item=>{
 
-if(f.path.match(/\.(jpg|jpeg|png)$/i)){
+if(item.path.match(/\.(jpg|jpeg|png)$/i)){
 
-files.push(f.path);
+files.push(item.path);
+
+const parts=item.path.split("/");
+const folder=parts.length>1?parts[0]:"root";
+
+if(!folders[folder]) folders[folder]=[];
+
+folders[folder].push(item.path);
 
 }
 
 });
 
-status.innerText="发现图片 "+files.length+" 张";
+buildFolders();
+buildThumbs(files);
 
-if(files.length==0){
+status.innerText="发现 "+files.length+" 张图片";
 
-status.innerText="⚠ 仓库没有找到图片";
-
-return;
-
-}
-
-buildThumbs();
+if(files.length>0){
 
 loadPanorama(CDN+files[0]);
+
+}
 
 }catch(e){
 
@@ -156,11 +241,47 @@ status.innerText="GitHub扫描失败";
 
 }
 
-function buildThumbs(){
+/* 构建目录 */
 
-thumbBar.innerHTML="";
+function buildFolders(){
 
-files.forEach(p=>{
+sidebar.innerHTML="";
+
+for(let f in folders){
+
+const div=document.createElement("div");
+
+div.className="folder";
+
+div.innerText=f;
+
+sidebar.appendChild(div);
+
+folders[f].forEach(p=>{
+
+const file=document.createElement("div");
+
+file.className="file";
+
+file.innerText=p.split("/").pop();
+
+file.onclick=()=>loadPanorama(CDN+p);
+
+sidebar.appendChild(file);
+
+});
+
+}
+
+}
+
+/* 构建缩略图 */
+
+function buildThumbs(list){
+
+thumbbar.innerHTML="";
+
+list.forEach(p=>{
 
 const url=CDN+p;
 
@@ -172,17 +293,33 @@ div.innerHTML=`<img src="${url}">`;
 
 div.onclick=()=>loadPanorama(url);
 
-thumbBar.appendChild(div);
+thumbbar.appendChild(div);
 
 });
 
 }
+
+/* 搜索 */
+
+search.onkeyup=function(){
+
+const kw=this.value.toLowerCase();
+
+const result=files.filter(p=>p.toLowerCase().includes(kw));
+
+buildThumbs(result);
+
+};
+
+/* 加载全景 */
 
 function loadPanorama(url){
 
 sky.setAttribute("src",url);
 
 }
+
+/* 随机 */
 
 function randomPanorama(){
 
@@ -192,13 +329,15 @@ loadPanorama(CDN+p);
 
 }
 
+/* 自动旋转 */
+
 function toggleRotate(){
 
 autoRotate=!autoRotate;
 
 if(autoRotate){
 
-sky.setAttribute("animation","property:rotation; to:0 360 0; loop:true; dur:30000");
+sky.setAttribute("animation","property:rotation;to:0 360 0;loop:true;dur:30000");
 
 }else{
 
@@ -207,6 +346,8 @@ sky.removeAttribute("animation");
 }
 
 }
+
+/* VR模式 */
 
 function enterVR(){
 
@@ -217,4 +358,5 @@ document.querySelector("a-scene").enterVR();
 </script>
 
 </body>
+
 </html>
